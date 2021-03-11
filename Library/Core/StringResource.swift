@@ -58,4 +58,81 @@ public struct StringResource: StringResourceType {
     self.value = value
     self.comment = comment
   }
+
+  public func callAsFunction(preferredLanguages: [String]? = nil) -> String {
+    guard let preferredLanguages = preferredLanguages else {
+      return NSLocalizedString(key, bundle: bundle, value: value ?? "", comment: comment ?? "")
+    }
+
+    guard let (_, bundle) = localeBundle(tableName: tableName, preferredLanguages: preferredLanguages) else {
+      return value ?? ""
+    }
+
+    return NSLocalizedString(key, bundle: bundle, value: "", comment: comment ?? "")
+  }
+
+  private var applicationLocale: Locale {
+    bundle.preferredLocalizations.first.flatMap { Locale(identifier: $0) } ?? Locale.current
+  }
+
+  private func localeBundle(tableName: String, preferredLanguages: [String]) -> (Foundation.Locale, Foundation.Bundle)? {
+    // Filter preferredLanguages to localizations, use first locale
+    var languages = preferredLanguages
+      .map { Locale(identifier: $0) }
+      .prefix(1)
+      .flatMap { locale -> [String] in
+        if bundle.localizations.contains(locale.identifier) {
+          if let language = locale.languageCode, bundle.localizations.contains(language) {
+            return [locale.identifier, language]
+          } else {
+            return [locale.identifier]
+          }
+        } else if let language = locale.languageCode, bundle.localizations.contains(language) {
+          return [language]
+        } else {
+          return []
+        }
+      }
+
+    // If there's no languages, use development language as backstop
+    if languages.isEmpty {
+      if let developmentLocalization = bundle.developmentLocalization {
+        languages = [developmentLocalization]
+      }
+    } else {
+      // Insert Base as second item (between locale identifier and languageCode)
+      languages.insert("Base", at: 1)
+
+      // Add development language as backstop
+      if let developmentLocalization = bundle.developmentLocalization {
+        languages.append(developmentLocalization)
+      }
+    }
+
+    // Find first language for which table exists
+    // Note: key might not exist in chosen language (in that case, key will be shown)
+    for language in languages {
+      if let lproj = bundle.url(forResource: language, withExtension: "lproj"),
+         let lbundle = Bundle(url: lproj)
+      {
+        let strings = lbundle.url(forResource: tableName, withExtension: "strings")
+        let stringsdict = lbundle.url(forResource: tableName, withExtension: "stringsdict")
+
+        if strings != nil || stringsdict != nil {
+          return (Locale(identifier: language), lbundle)
+        }
+      }
+    }
+
+    // If table is available in main bundle, don't look for localized resources
+    let strings = bundle.url(forResource: tableName, withExtension: "strings", subdirectory: nil, localization: nil)
+    let stringsdict = bundle.url(forResource: tableName, withExtension: "stringsdict", subdirectory: nil, localization: nil)
+
+    if strings != nil || stringsdict != nil {
+      return (applicationLocale, bundle)
+    }
+
+    // If table is not found for requested languages, key will be shown
+    return nil
+  }
 }
