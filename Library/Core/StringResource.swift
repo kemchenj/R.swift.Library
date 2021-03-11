@@ -22,7 +22,10 @@ public protocol StringResourceType {
 
   /// Locales of the a localizable string
   var locales: [String] { get }
-  
+
+  /// The value to return if key is nil or if a localized string for key can’t be found in the table.
+  var value: String? { get }
+
   /// Comment directly before and/or after the string, if any
   var comment: String? { get }
 }
@@ -40,15 +43,19 @@ public struct StringResource: StringResourceType {
 
   /// Locales of the a localizable string
   public let locales: [String]
-  
+
+  /// The value to return if key is nil or if a localized string for key can’t be found in the table.
+  public let value: String?
+
   /// Comment directly before and/or after the string, if any
   public let comment: String?
 
-  public init(key: String, tableName: String, bundle: Bundle, locales: [String], comment: String?) {
+  public init(key: String, tableName: String, bundle: Bundle, locales: [String], value: String?, comment: String?) {
     self.key = key
     self.tableName = tableName
     self.bundle = bundle
     self.locales = locales
+    self.value = value
     self.comment = comment
   }
 }
